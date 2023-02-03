@@ -52,7 +52,9 @@ async fn get_eth_gas_price() -> Result<String, String> {
 #[update(name = "get_canister_addr")]
 #[candid_method(update, rename = "get_canister_addr")]
 async fn get_canister_addr() -> Result<String, String> {
-    match get_eth_addr(None, None, KEY_NAME.to_string()).await {
+    let key_info = KeyInfo{ derivation_path: vec![ic_cdk::id().as_slice().to_vec()], key_name: KEY_NAME.to_string(), ecdsa_sign_cycles: None, proxy_canister_id: None };
+    
+    match get_eth_addr(None, key_info).await {
         Ok(addr) => { Ok(hex::encode(addr)) },
         Err(e) => { Err(e) },
     }
@@ -100,10 +102,10 @@ async fn batch_request() -> Result<String, String> {
 async fn send_eth(to: String, value: u64) -> Result<String, String> {
     // ecdsa key info
     let derivation_path = vec![ic_cdk::id().as_slice().to_vec()];
-    let key_info = KeyInfo{ derivation_path: derivation_path, key_name: KEY_NAME.to_string(), ecdsa_sign_cycles: None };
+    let key_info = KeyInfo{ derivation_path: derivation_path, key_name: KEY_NAME.to_string(), ecdsa_sign_cycles: None, proxy_canister_id: None };
 
     // get canister eth address
-    let from_addr = get_eth_addr(None, None, KEY_NAME.to_string())
+    let from_addr = get_eth_addr(None, key_info.clone())
         .await
         .map_err(|e| format!("get canister eth addr failed: {}", e))?;
     // get canister the address tx count
@@ -173,7 +175,7 @@ async fn token_balance(contract_addr: String, addr: String) -> Result<String, St
 async fn send_token(token_addr: String, addr: String, value: u64) -> Result<String, String> {
     // ecdsa key info
     let derivation_path = vec![ic_cdk::id().as_slice().to_vec()];
-    let key_info = KeyInfo{ derivation_path: derivation_path, key_name: KEY_NAME.to_string(), ecdsa_sign_cycles: None };
+    let key_info = KeyInfo{ derivation_path: derivation_path, key_name: KEY_NAME.to_string(), ecdsa_sign_cycles: None, proxy_canister_id: None };
 
     let w3 = match ICHttp::new(URL, None, None) {
         Ok(v) => { Web3::new(v) },
@@ -186,7 +188,7 @@ async fn send_token(token_addr: String, addr: String, value: u64) -> Result<Stri
         TOKEN_ABI
     ).map_err(|e| format!("init contract failed: {}", e))?;
 
-    let canister_addr = get_eth_addr(None, None, KEY_NAME.to_string())
+    let canister_addr = get_eth_addr(None, key_info.clone())
         .await
         .map_err(|e| format!("get canister eth addr failed: {}", e))?;
     // add nonce to options

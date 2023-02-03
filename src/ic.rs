@@ -26,29 +26,28 @@ pub struct KeyInfo {
     pub derivation_path: Vec<Vec<u8>>,
     pub key_name: String,
     pub ecdsa_sign_cycles: Option<u64>,
+    pub proxy_canister_id: Option<Principal>,
 }
 
 /// get public key from ic, 
 /// derivation_path: 4-byte big-endian encoding of an unsigned integer less than 2^31
 pub async fn get_public_key(
     canister_id: Option<Principal>, 
-    derivation_path: Vec<Vec<u8>>,
-    key_name: String
+    key_info: KeyInfo,
 ) -> Result<Vec<u8>, String> {
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
-        name: key_name,
+        name: key_info.key_name,
     };
-    let ic_canister_id = "aaaaa-aa";
-    let ic = Principal::from_str(&ic_canister_id).unwrap();
-
-
+    
+    let ic_canister = key_info.proxy_canister_id.unwrap_or(Principal::management_canister());
+    
     let request = EcdsaPublicKeyArgument {
         canister_id: canister_id,
-        derivation_path: derivation_path,
+        derivation_path: key_info.derivation_path,
         key_id: key_id.clone(),
     };
-    let (res,): (EcdsaPublicKeyResponse,) = ic_cdk::call(ic, "ecdsa_public_key", (request,))
+    let (res,): (EcdsaPublicKeyResponse,) = ic_cdk::call(ic_canister, "ecdsa_public_key", (request,))
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))?;
 
@@ -70,11 +69,9 @@ pub fn pubkey_to_address(pubkey: &[u8]) -> Result<Address, String> {
 /// get canister's eth address
 pub async fn get_eth_addr(
     canister_id: Option<Principal>, 
-    derivation_path: Option<Vec<Vec<u8>>>,
-    name: String
+    key_info: KeyInfo,
 ) -> Result<Address, String> {
-    let path = if let Some(v) = derivation_path { v } else { vec![ic_cdk::id().as_slice().to_vec()] };
-    match get_public_key(canister_id, path, name).await {
+    match get_public_key(canister_id, key_info).await {
         Ok(pubkey) => { return pubkey_to_address(&pubkey); },
         Err(e) => { return Err(e); },
     };
@@ -91,7 +88,6 @@ pub async fn ic_raw_sign(
         curve: EcdsaCurve::Secp256k1,
         name: key_info.key_name,
     };
-    let ic = Principal::management_canister();
 
     let request = SignWithEcdsaArgument {
         message_hash: message.clone(),
@@ -100,9 +96,10 @@ pub async fn ic_raw_sign(
     };
 
     let ecdsa_sign_cycles = key_info.ecdsa_sign_cycles.unwrap_or(ECDSA_SIGN_CYCLES);
-
+    let ic_canister = key_info.proxy_canister_id.unwrap_or(Principal::management_canister());
+    
     let (res,): (SignWithEcdsaResponse,) =
-        ic_cdk::api::call::call_with_payment(ic, "sign_with_ecdsa", (request,), ecdsa_sign_cycles)
+        ic_cdk::api::call::call_with_payment(ic_canister, "sign_with_ecdsa", (request,), ecdsa_sign_cycles)
             .await
             .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
