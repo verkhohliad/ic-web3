@@ -99,7 +99,7 @@ pub async fn ic_raw_sign(
     let ic_canister = key_info.proxy_canister_id.unwrap_or(Principal::management_canister());
     
     let (res,): (SignWithEcdsaResponse,) =
-        ic_cdk::api::call::call_with_payment(ic_canister, "sign_with_ecdsa", (request,), ecdsa_sign_cycles)
+        ic_cdk::api::call::call_with_payment(ic_canister, "sign_with_ecdsa", (request, ecdsa_sign_cycles), ecdsa_sign_cycles)
             .await
             .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
