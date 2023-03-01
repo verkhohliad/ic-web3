@@ -96,12 +96,20 @@ pub async fn ic_raw_sign(
     };
 
     let ecdsa_sign_cycles = key_info.ecdsa_sign_cycles.unwrap_or(ECDSA_SIGN_CYCLES);
-    let ic_canister = key_info.proxy_canister_id.unwrap_or(Principal::management_canister());
     
-    let (res,): (SignWithEcdsaResponse,) =
-        ic_cdk::api::call::call_with_payment(ic_canister, "sign_with_ecdsa", (request, ecdsa_sign_cycles), ecdsa_sign_cycles)
-            .await
-            .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
+    // make a call_with_payment if there is no key_info.proxy_canister_id, otherwise call without payment and pass the cycles to the proxy canister
+    let (res,): (SignWithEcdsaResponse,) = match key_info.proxy_canister_id {
+        Some(canister_id) => {
+            ic_cdk::call(canister_id, "sign_with_ecdsa", (request, ecdsa_sign_cycles))
+                .await
+                .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?
+        },
+        None => {
+            ic_cdk::api::call::call_with_payment(Principal::management_canister(), "sign_with_ecdsa", (request), ecdsa_sign_cycles)
+                .await
+                .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?
+        },
+    };
 
     Ok(res.signature)
 }
