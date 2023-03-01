@@ -105,7 +105,7 @@ pub async fn ic_raw_sign(
                 .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?
         },
         None => {
-            ic_cdk::api::call::call_with_payment(Principal::management_canister(), "sign_with_ecdsa", (request), ecdsa_sign_cycles)
+            ic_cdk::api::call::call_with_payment(Principal::management_canister(), "sign_with_ecdsa", (request,), ecdsa_sign_cycles)
                 .await
                 .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?
         },
