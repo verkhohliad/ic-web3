@@ -31,10 +31,11 @@ pub use self::{
 use crate::{
     confirm, error,
     types::{Bytes, TransactionReceipt, TransactionRequest, U64},
-    DuplexTransport, Transport,
+    DuplexTransport, Transport, RequestId, Error,
 };
 use futures::Future;
 use std::time::Duration;
+use jsonrpc_core::types::Call;
 
 /// Common API for all namespaces
 pub trait Namespace<T: Transport>: Clone {
@@ -60,6 +61,11 @@ impl<T: Transport> Web3<T> {
     /// Borrows a transport.
     pub fn transport(&self) -> &T {
         &self.transport
+    }
+
+    /// set the max response bytes
+    pub fn set_max_response_bytes(&mut self, bytes: u64) {
+        self.transport.set_max_response_bytes(bytes)
     }
 
     /// Access methods from custom namespace
@@ -154,6 +160,16 @@ impl<T: Transport> Web3<T> {
         confirmations: usize,
     ) -> error::Result<TransactionReceipt> {
         confirm::send_raw_transaction_with_confirmation(self.transport.clone(), tx, poll_interval, confirmations).await
+    }
+
+    /// Call json rpc directly
+    pub async fn json_rpc_call(&self, body: &str) -> error::Result<String> {
+        let request: Call = serde_json::from_str(body).map_err(|_| Error::Decoder(body.to_string()))?;
+        // currently, the request id is not used
+        self.transport
+            .send(RequestId::default(), request)
+            .await
+            .map(|v| format!("{}", v))
     }
 }
 
